@@ -19,6 +19,12 @@ class MinimalSource(BaseModel):
     first_character_index: int
     last_character_index: int
 
+    def __str__(self) -> str:
+        return (
+            f"path: {self.file_path} start at {self.first_character_index}"
+            f" end at {self.last_character_index}"
+        )
+
 
 class UnansweredQuestion(BaseModel):
     """Represents a question that has not yet been answered.
