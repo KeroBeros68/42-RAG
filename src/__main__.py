@@ -12,6 +12,7 @@ import subprocess
 import sys
 import time
 
+from src.Controller import Controller
 from src.utils.logger.Logger import setup_logger
 from src.utils.run_security import RunSecurity, RunEnvironmentError
 
@@ -37,6 +38,10 @@ def get_terminal_command():
     return None
 
 
+def coucou(name):
+    print(name)
+
+
 def main() -> None:
     """Run the main application flow.
 
@@ -60,6 +65,17 @@ def main() -> None:
         input("\n\nPress Enter to exit...")
         return
 
+    if "--child" in sys.argv:
+        sys.argv.remove("--child")
+
+    from fire import Fire  # type: ignore
+    try:
+        Fire(Controller(logger))
+    except Exception as e:
+        logger.error(f"{e}")
+        logger.info("Programm exit")
+        input("\n\nPress Enter to exit...")
+        return
     input("\n\nPress Enter to exit...")
     return
 
@@ -67,14 +83,21 @@ def main() -> None:
 if __name__ == "__main__":
     if "--child" not in sys.argv and "--gui" not in sys.argv:
         terminal = get_terminal_command()
-        args = [sys.executable, "-m", "src", "--child"] + sys.argv[1:]
-        subprocess.Popen(
-            [terminal[0], terminal[1]] + args,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        )
-        os._exit(0)
+        if not terminal:
+            # Fallback si aucun terminal n'est trouvé : on lance en direct
+            setup_logger(PROG_NAME)
+            main()
+        else:
+            args = [sys.executable, "-m", "src", "--child"] + sys.argv[1:]
+            subprocess.Popen(
+                [terminal[0], terminal[1]] + args,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+                cwd=os.path.dirname(
+                    os.path.dirname(os.path.abspath(__file__))
+                ),
+            )
+            os._exit(0)
     setup_logger(PROG_NAME)
     main()
