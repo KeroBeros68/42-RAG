@@ -9,10 +9,15 @@ class Controller:
 
     def index(self, max_chunk_size=2000) -> None:
         print("max chunk size ", max_chunk_size)
+        self.logger.info(f"max chunk size {max_chunk_size}")
         all_chunks = Ingest.ingest_repository(max_chunk_size)
-        for chunk in all_chunks:
-            print(chunk)
-        self.logger.info(all_chunks)
+        Ingest.save_chunks_to_json(all_chunks)
+        self.logger.info(
+            "Ingestion complete! Indices saved under data/processed/"
+        )
+        self.logger.info(
+            f"Total chunks: {len(all_chunks)}"
+        )
         print("Ingestion complete! Indices saved under data/processed/")
 
     def search(self):

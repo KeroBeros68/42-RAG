@@ -207,5 +207,6 @@ marimo/_lsp/
 __marimo__/
 
 subject.txt
+reference.txt
 src/data/raw/*
-
+src/data/processed/*
