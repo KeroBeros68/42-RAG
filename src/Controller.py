@@ -1,7 +1,7 @@
 from logging import Logger
 
 from src.Indexer import Indexer
-from src.test import verify_bm25
+from src.Retriever import Retriever
 
 
 class Controller:
@@ -12,7 +12,7 @@ class Controller:
         print("max chunk size ", max_chunk_size)
         self.logger.info(f"max chunk size {max_chunk_size}")
 
-        all_chunks = Indexer.load_and_chunk("src/data/raw", max_chunk_size)
+        all_chunks = Indexer.load_and_chunk("src/data/raw/", max_chunk_size)
         Indexer.build_bm25_index(all_chunks)
         if chroma:
             Indexer.build_chromadb_index(all_chunks)
@@ -21,8 +21,9 @@ class Controller:
         )
         print("Ingestion complete! Indices saved under data/processed/")
 
-    def search(self):
-        verify_bm25("What activation formats does the fused batched MoE layer return in vLLM?")
+    def search(self, query: str):
+        self.logger.info(f"Search Mode\nQuerry: {query}")
+        Retriever.search_mode(query)
 
     def search_dataset(self):
         pass

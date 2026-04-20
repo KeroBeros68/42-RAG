@@ -18,11 +18,30 @@ class MinimalSource(BaseModel):
     file_path: str
     first_character_index: int
     last_character_index: int
+    score: float = Field(default=0)
 
     def __str__(self) -> str:
         return (
             f"path: {self.file_path} start at {self.first_character_index}"
             f" end at {self.last_character_index}"
+        )
+
+    def __eq__(self, other):
+        if not isinstance(other, MinimalSource):
+            return False
+        return (
+            self.file_path == other.file_path
+            and self.first_character_index == other.first_character_index
+            and self.last_character_index == other.last_character_index
+        )
+
+    def __hash__(self):
+        return hash(
+            (
+                self.file_path,
+                self.first_character_index,
+                self.last_character_index,
+            )
         )
 
 
