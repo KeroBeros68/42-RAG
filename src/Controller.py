@@ -1,27 +1,28 @@
 from logging import Logger
 
-from src.Ingest import Ingest
+from src.Indexer import Indexer
+from src.test import verify_bm25
 
 
 class Controller:
     def __init__(self, logger) -> None:
         self.logger: Logger = logger
 
-    def index(self, max_chunk_size=2000) -> None:
+    def index(self, max_chunk_size=2000, chroma=False) -> None:
         print("max chunk size ", max_chunk_size)
         self.logger.info(f"max chunk size {max_chunk_size}")
-        all_chunks = Ingest.ingest_repository(max_chunk_size)
-        Ingest.save_chunks_to_json(all_chunks)
+
+        all_chunks = Indexer.load_and_chunk("src/data/raw", max_chunk_size)
+        Indexer.build_bm25_index(all_chunks)
+        if chroma:
+            Indexer.build_chromadb_index(all_chunks)
         self.logger.info(
             "Ingestion complete! Indices saved under data/processed/"
-        )
-        self.logger.info(
-            f"Total chunks: {len(all_chunks)}"
         )
         print("Ingestion complete! Indices saved under data/processed/")
 
     def search(self):
-        pass
+        verify_bm25("What activation formats does the fused batched MoE layer return in vLLM?")
 
     def search_dataset(self):
         pass
