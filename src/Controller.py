@@ -7,13 +7,14 @@ from src.Retriever import Retriever
 class Controller:
     RAW_DIR_PATH: str = "src/data/raw/"
     PROCESSED_DIR_PATH: str = "src/data/processed/"
-    DATASET_DIR_PATH: str = "src/data/dataset/"
+    DATASET_DIR_PATH: str = "src/data/datasets/"
     DEFAULT_UNANSWERED_CODE_DATASET: str = (
         DATASET_DIR_PATH + "UnansweredQuestions/dataset_code_public.json"
     )
     DEFAULT_UNANSWERED_DOCS_DATASET: str = (
         DATASET_DIR_PATH + "UnansweredQuestions/dataset_docs_public.json"
     )
+    SEARCH_RESULT_DIR: str = "src/data/output/search_results/"
 
     def __init__(self, logger) -> None:
         self.logger: Logger = logger
@@ -34,17 +35,27 @@ class Controller:
     def search(self, query: str, k: int = 5, chroma: bool = False):
         self.logger.info(f"Search Mode\nQuerry: {query}")
         search_res = Retriever.search_mode(query, k, chroma)
-        Retriever.print_res(search_res, query, k)
+        return search_res
 
-    def search_dataset(self, dataset: str, k: int = 5, chroma: bool = False):
-        match dataset:
+    def search_dataset(
+        self,
+        path: str = "code",
+        k: int = 5,
+        chroma: bool = False,
+    ):
+        match path:
             case "code":
-                dataset = self.DEFAULT_UNANSWERED_CODE_DATASET
+                path = self.DEFAULT_UNANSWERED_CODE_DATASET
             case "docs":
-                dataset = self.DEFAULT_UNANSWERED_DOCS_DATASET
+                path = self.DEFAULT_UNANSWERED_DOCS_DATASET
             case _:
                 pass
-        self.logger.info(f"Search Dataset Mode\nDataset: {dataset}")
+        self.logger.info(f"Search Dataset Mode\nDataset: {path}")
+
+        dataset = Retriever.read_dataset(path)
+
+        res = Retriever.process_multiple_querry(dataset, k, chroma)
+        Retriever.save_search(res.model_dump_json(indent=4), path)
 
     def answer(self):
         pass

@@ -1,10 +1,13 @@
+import json
+from pathlib import Path
+
 import bm25s  # type: ignore
 import pickle
 
 import chromadb
 from sentence_transformers import SentenceTransformer
 
-from src.models.models import MinimalSource
+from src.models.models import MinimalSource, RagDataset, StudentSearchResults
 
 
 class Retriever:
@@ -13,6 +16,7 @@ class Retriever:
     CHUNKS_PATH: str = "src/data/processed/chunks.pkl"
     K_COEFFICIENT: int = 5
 
+    SEARCH_RESULT_DIR: str = "src/data/output/search_results/"
     # chromadb const
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
 
@@ -20,7 +24,7 @@ class Retriever:
 
     @classmethod
     def search_mode(cls, query, k=5, chroma=False):
-        chunks = cls._open_file()
+        chunks = cls._open_chunks_file()
         search_res = cls._search_bm25(query, chunks, k)
         if chroma:
             search_res.extend(cls._search_chromadb(query, k))
@@ -29,7 +33,7 @@ class Retriever:
         return search_res
 
     @classmethod
-    def _open_file(cls):
+    def _open_chunks_file(cls):
         with open(cls.CHUNKS_PATH, "rb") as f:
             metadata = pickle.load(f)
         return metadata
@@ -115,3 +119,44 @@ class Retriever:
                 f"    Position: {source.first_character_index}"
                 f" -> {source.last_character_index}"
             )
+
+    @staticmethod
+    def read_dataset(path):
+        try:
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                data_dict = json.load(f)
+            return RagDataset.model_validate(data_dict).model_dump()
+        except Exception as e:  # A CHANGER
+            print(str(e))
+            raise
+
+    @classmethod
+    def save_search(cls, search_result: str, dataset_path: str):
+        output_dir = Path(cls.SEARCH_RESULT_DIR)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        file_name = Path(dataset_path).name
+        output_path = output_dir / file_name
+        with open(output_path, "w") as f:
+            f.write(search_result)
+
+    @classmethod
+    def process_multiple_querry(cls, dataset, k, chroma):
+        res_data = {"k": k, "search_results": []}
+
+        for data in dataset["rag_questions"]:
+            search_res: list[MinimalSource] = cls.search_mode(
+                data["question"], k, chroma
+            )
+
+            data["retrieved_sources"] = [
+                source.model_dump() for source in search_res[:k]
+            ]
+
+            res_data["search_results"].append(data)
+
+        try:
+            return StudentSearchResults.model_validate(res_data)
+        except Exception as e:  # A CHANGER
+            print(str(e))
+            raise
