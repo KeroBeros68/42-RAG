@@ -102,9 +102,16 @@ class Indexer:
         Path(save_dir).mkdir(parents=True, exist_ok=True)
 
         def clean_text(text):
-            text = re.sub(r'([a-z])([A-Z])', r'\1 \2', text)
+            text = re.sub(r"([a-z])([A-Z])", r"\1 \2", text)
             text = re.sub(r"[^\w\s]", " ", text).replace("_", " ")
             return text.lower()
+
+        for chunk in chunks:
+            file_name = chunk.get("file_path", "")
+            clean_context = (
+                file_name.replace(".py", "").replace("_", " ")
+            )
+            chunk["text"] = f"Context: {clean_context} | {chunk['text']}"
 
         corpus_cleaned = [clean_text(c["text"]) for c in chunks]
         corpus_tokens = bm25s.tokenize(
@@ -113,7 +120,7 @@ class Indexer:
             show_progress=True,
         )
 
-        retriever = bm25s.BM25(k1=1.2, b=0.85)
+        retriever = bm25s.BM25(k1=0.5, b=0.9)
         retriever.index(corpus_tokens, show_progress=True)
         retriever.save(f"{save_dir}/bm25_index")
 

@@ -67,8 +67,14 @@ def main() -> None:
     from fire import Fire  # type: ignore
     try:
         Fire(Controller(logger))
+    except SystemExit as e:
+        if e.code != 0:
+            logger.error(f"Fire error (Code: {e.code})")
+            logger.info("Program exit")
+        else:
+            pass
     except Exception as e:
-        logger.error(f"{e}")
+        logger.error(f"{str(e)}")
         logger.info("Programm exit")
         input("\n\nPress Enter to exit...")
         return
@@ -80,8 +86,7 @@ if __name__ == "__main__":
     if "--child" not in sys.argv and "--gui" not in sys.argv:
         terminal = get_terminal_command()
         if not terminal:
-            setup_logger(PROG_NAME)
-            main()
+            pass
         else:
             args = [sys.executable, "-m", "src", "--child"] + sys.argv[1:]
             subprocess.Popen(

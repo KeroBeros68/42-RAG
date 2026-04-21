@@ -26,7 +26,7 @@ class Retriever:
             search_res.extend(cls._search_chromadb(query, k))
         search_res = list(set(search_res))
         search_res.sort(key=lambda x: x.score, reverse=True)
-        cls._print_res(search_res, query, k)
+        return search_res
 
     @classmethod
     def _open_file(cls):
@@ -43,9 +43,7 @@ class Retriever:
     ) -> list[MinimalSource]:
 
         bm25_res: list[MinimalSource] = []
-        retriever = bm25s.BM25(k1=1.2, b=0.85).load(
-            cls.BM25_INDEX_PATH, load_corpus=True
-        )
+        retriever = bm25s.BM25().load(cls.BM25_INDEX_PATH, load_corpus=True)
 
         query_tokens = bm25s.tokenize(
             [query],
@@ -106,12 +104,14 @@ class Retriever:
 
         return res
 
-    def _print_res(sources, query, k=5):
+    @staticmethod
+    def print_res(sources: list[MinimalSource], query: str, k: int = 5):
         print(f"Résultats pour : '{query}'")
 
         for i, source in enumerate(sources):
             print(f"[{i+1}] Score: {source.score:.4f}")
             print(f"    Fichier: {source.file_path}")
             print(
-                f"    Position: {source.first_character_index} -> {source.last_character_index}"
+                f"    Position: {source.first_character_index}"
+                f" -> {source.last_character_index}"
             )
