@@ -61,8 +61,9 @@ class Retriever:
         for i in range(k * cls.K_COEFFICIENT):
             doc_index = results[0, i]
             source: MinimalSource = chunks[doc_index]
-            source.score = float(scores[0, i])
-            bm25_res.append(source)
+            bm25_res.append(
+                source.model_copy(update={"score": float(scores[0, i])})
+            )
 
         return cls._harmonize_score(bm25_res)
 
