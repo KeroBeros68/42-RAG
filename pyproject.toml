@@ -11,10 +11,15 @@ dependencies = [
     "langchain>=1.2.15",
     "langchain-core>=1.2.30",
     "langchain-text-splitters>=1.1.1",
-    "pickles>=0.1.1",
     "pydantic>=2.13.0",
-    "pytest>=9.0.3",
     "sentence-transformers>=5.4.1",
     "tqdm>=4.67.3",
     "types-tqdm>=4.67.3.20260408",
+]
+
+[dependency-groups]
+dev = [
+    "flake8>=7.3.0",
+    "mypy>=1.20.2",
+    "pytest>=9.0.3",
 ]

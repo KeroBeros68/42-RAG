@@ -120,7 +120,7 @@ install:
 # Run the main program.
 # $(PYTHON) $(NAME) $(ARGV)
 run:
-	uv run python -m src $(ARGV)
+	$(PYTHON) -m src $(ARGV)
 
 # Run the program with debugger.
 debug:
@@ -146,17 +146,17 @@ test:
 # Run standard lint checks.
 lint:
 	$(ECHO) "$(CYAN)Running flake8...$(RESET)";
-	$(FLAKE8) --exclude='.venv,llm_sdk'
+	$(FLAKE8) --exclude='.venv,llm_sdk, src/data'
 	$(ECHO) "$(CYAN)Running mypy...$(RESET)";
-	$(MYPY) --explicit-package-bases --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs --exclude '.venv' --exclude 'llm_sdk' $(SRC_MYPY)
+	$(MYPY) --explicit-package-bases --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs --exclude '.venv' --exclude 'src/data' $(SRC_MYPY)
 	$(MAKE) clean
 
 # Run stricter lint checks.
 lint-strict:
 	$(ECHO) "$(CYAN)Running flake8...$(RESET)";
-	$(FLAKE8) --exclude='.venv,llm_sdk'
+	$(FLAKE8) --exclude='.venv,llm_sdk,src/data'
 	$(ECHO) "$(CYAN)Running mypy...$(RESET)";
-	$(MYPY) --explicit-package-bases --strict --exclude '.venv' --exclude 'llm_sdk' $(SRC_MYPY)
+	$(MYPY) --explicit-package-bases --strict --exclude '.venv' --exclude 'src/data' $(SRC_MYPY)
 	$(MAKE) clean
 
 

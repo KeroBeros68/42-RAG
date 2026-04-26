@@ -40,7 +40,7 @@ PROG_HELP: str = (
 )
 
 
-def get_terminal_command():
+def get_terminal_command() -> list[str] | None:
     known_terminals = [
         {"cmd": "gnome-terminal", "flag": "--"},
         {"cmd": "konsole", "flag": "-e"},
@@ -82,7 +82,7 @@ def main() -> None:
     if "--child" in sys.argv:
         sys.argv.remove("--child")
 
-    from fire import Fire  # type: ignore
+    from fire import Fire
     try:
         Fire(Controller(logger))
     except SystemExit as e:

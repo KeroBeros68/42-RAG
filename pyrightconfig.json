@@ -1,0 +1,11 @@
+{
+  "include": ["src"],
+  "exclude": ["src/data", ".venv"],
+  "typeCheckingMode": "off",
+  "reportUnknownMemberType": "none",
+  "reportUnknownArgumentType": "none",
+  "reportUnknownVariableType": "none",
+  "reportUnknownParameterType": "none",
+  "reportMissingModuleSource": "none",
+  "reportMissingStubs": "none"
+}

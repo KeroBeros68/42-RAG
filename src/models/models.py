@@ -26,7 +26,7 @@ class MinimalSource(BaseModel):
             f" end at {self.last_character_index}"
         )
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, MinimalSource):
             return False
         return (
@@ -35,7 +35,7 @@ class MinimalSource(BaseModel):
             and self.last_character_index == other.last_character_index
         )
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(
             (
                 self.file_path,
@@ -141,4 +141,4 @@ class StudentSearchResultsAndAnswer(StudentSearchResults):
         an answer.
     """
 
-    search_results: list[MinimalAnswer]
+    search_results: Sequence[MinimalAnswer]

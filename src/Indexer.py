@@ -1,8 +1,9 @@
 from pathlib import Path
 import re
+from typing import TypedDict
 
 
-import bm25s  # type: ignore
+import bm25s
 import chromadb
 import pickle
 from langchain_core.documents import Document
@@ -14,9 +15,23 @@ from tqdm import tqdm
 from src.models.models import MinimalSource
 
 
+class Chunk(TypedDict):
+    file_path: str
+    text: str
+    first_character_index: int
+    last_character_index: int
+
+
 class Indexer:
 
-    EXCLUDE_DIRS = {".git", ".venv", "__pycache__", "build", "dist", "test"}
+    EXCLUDE_DIRS: set[str] = {
+        ".git",
+        ".venv",
+        "__pycache__",
+        "build",
+        "dist",
+        "test",
+    }
     DEFAULT_SAVE_DIR: str = "src/data/processed"
 
     # chunk const
@@ -32,9 +47,11 @@ class Indexer:
     BATCH_SIZE: int = 256
 
     @classmethod
-    def load_and_chunk(cls, repo_path: str, chunk_size: int = MAX_CHUNK_SIZE):
-        all_chunks = []
-        files = []
+    def load_and_chunk(
+        cls, repo_path: str, chunk_size: int = MAX_CHUNK_SIZE
+    ) -> list[Chunk]:
+        all_chunks: list[Chunk] = []
+        files: list[Path] = []
         for ext in ["*.py", "*.md", "*.c", "*.cpp", "*.h", "*.toml"]:
             for p in Path(repo_path).rglob(ext):
                 if not any(
@@ -62,7 +79,7 @@ class Indexer:
     @classmethod
     def chunk_file(
         cls, file_path: str, content: str, chunk_size: int = MAX_CHUNK_SIZE
-    ):
+    ) -> list[Chunk]:
         extension = Path(file_path).suffix
 
         overlap = int(chunk_size * cls.OVERLAP_COEFFICIENT)
@@ -85,23 +102,25 @@ class Indexer:
         split_docs = splitter.split_documents([doc])
 
         return [
-            {
-                "file_path": file_path,
-                "text": d.page_content,
-                "first_character_index": d.metadata["start_index"],
-                "last_character_index": d.metadata["start_index"]
+            Chunk(
+                file_path=file_path,
+                text=d.page_content,
+                first_character_index=int(d.metadata["start_index"]),
+                last_character_index=int(d.metadata["start_index"])
                 + len(d.page_content),
-            }
+            )
             for d in split_docs
         ]
 
     @classmethod
     def build_bm25_index(
-        cls, chunks: list[dict], save_dir: str = DEFAULT_SAVE_DIR
+        cls,
+        chunks: list[Chunk],
+        save_dir: str = DEFAULT_SAVE_DIR,
     ) -> None:
         Path(save_dir).mkdir(parents=True, exist_ok=True)
 
-        def clean_text(text):
+        def clean_text(text: str) -> str:
             text = re.sub(r"([a-z])([A-Z])", r"\1 \2", text)
             text = re.sub(r"[^\w\s]", " ", text).replace("_", " ")
             return text.lower()
@@ -113,7 +132,9 @@ class Indexer:
             )
             chunk["text"] = f"Context: {clean_context} | {chunk['text']}"
 
-        corpus_cleaned = [clean_text(c["text"]) for c in chunks]
+        corpus_cleaned = [
+            clean_text(c["text"]) for c in chunks
+        ]
         corpus_tokens = bm25s.tokenize(
             corpus_cleaned,
             stopwords="en_plus",
@@ -127,9 +148,15 @@ class Indexer:
         with open(f"{save_dir}/chunks.pkl", "wb") as f:
             metadata = [
                 MinimalSource(
-                    file_path=c["file_path"],
-                    first_character_index=c["first_character_index"],
-                    last_character_index=c["last_character_index"],
+                    file_path=(
+                        c["file_path"]
+                    ),
+                    first_character_index=(
+                        c["first_character_index"]
+                    ),
+                    last_character_index=(
+                        c["last_character_index"]
+                    ),
                 )
                 for c in chunks
             ]
@@ -139,7 +166,9 @@ class Indexer:
 
     @classmethod
     def build_chromadb_index(
-        cls, chunks: list[dict], save_dir: str = DEFAULT_SAVE_DIR
+        cls,
+        chunks: list[Chunk],
+        save_dir: str = DEFAULT_SAVE_DIR,
     ) -> None:
         retriever = chromadb.PersistentClient(path=save_dir)
 
@@ -154,9 +183,11 @@ class Indexer:
         for i in tqdm(
             range(0, len(chunks), batch_size), desc="Indexing ChromaDB..."
         ):
-            batch = chunks[i: i + batch_size]
+            batch = chunks[i:i + batch_size]
 
-            texts = [c["text"].lower() for c in batch]
+            texts = [
+                c["text"].lower() for c in batch
+            ]
 
             embeddings = model.encode(texts, show_progress_bar=False).tolist()
 

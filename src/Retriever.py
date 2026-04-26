@@ -1,7 +1,8 @@
 import json
 from pathlib import Path
+from typing import Any, Optional
 
-import bm25s  # type: ignore
+import bm25s
 import pickle
 
 import chromadb
@@ -17,15 +18,58 @@ class Retriever:
     K_COEFFICIENT: int = 5
 
     SEARCH_RESULT_DIR: str = "src/data/output/search_results/"
-    # chromadb const
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
-
     COLLECTION_NAME: str = "Corpus"
 
+    _chroma_retriever: Optional[chromadb.PersistentClient] = None
+    _collection: chromadb.Collection | None = None
+    _chroma_embedding: SentenceTransformer | None = None
+    _bm25_retriever: bm25s.BM25 | None = None
+    _chunks: list[MinimalSource] | None = None
+
     @classmethod
-    def search_mode(cls, query, k=5, chroma=False):
-        chunks = cls._open_chunks_file()
-        search_res = cls._search_bm25(query, chunks, k)
+    def _get_chroma_retriever(cls) -> chromadb.PersistentClient:
+        if cls._chroma_retriever is None:
+            cls._chroma_retriever = chromadb.PersistentClient(
+                path=cls.DATA_DIR
+            )
+        return cls._chroma_retriever
+
+    @classmethod
+    def _get_collection(cls) -> chromadb.Collection:
+        if cls._collection is None:
+            cls._collection = cls._get_chroma_retriever().get_collection(
+                cls.COLLECTION_NAME
+            )
+        return cls._collection
+
+    @classmethod
+    def _get_chroma_embedding(cls) -> SentenceTransformer:
+        if cls._chroma_embedding is None:
+            cls._chroma_embedding = SentenceTransformer(cls.EMBEDDING_MODEL)
+        return cls._chroma_embedding
+
+    @classmethod
+    def _get_bm25_retriever(cls) -> bm25s.BM25:
+        if cls._bm25_retriever is None:
+            cls._bm25_retriever = bm25s.BM25().load(
+                cls.BM25_INDEX_PATH, load_corpus=True
+            )
+        return cls._bm25_retriever
+
+    @classmethod
+    def _get_chunks(cls) -> list[MinimalSource]:
+        if cls._chunks is None:
+            with open(cls.CHUNKS_PATH, "rb") as f:
+                cls._chunks = pickle.load(f)
+        return cls._chunks
+
+    @classmethod
+    def search_mode(
+        cls, query: str, k: int = 5, chroma: bool = False
+    ) -> list[MinimalSource]:
+
+        search_res = cls._search_bm25(query, cls._get_chunks(), k)
         if chroma:
             search_res.extend(cls._search_chromadb(query, k))
         search_res = list(set(search_res))
@@ -33,21 +77,14 @@ class Retriever:
         return search_res
 
     @classmethod
-    def _open_chunks_file(cls):
-        with open(cls.CHUNKS_PATH, "rb") as f:
-            metadata = pickle.load(f)
-        return metadata
-
-    @classmethod
     def _search_bm25(
         cls,
         query: str,
-        chunks,
+        chunks: list[MinimalSource],
         k: int = 5,
     ) -> list[MinimalSource]:
 
         bm25_res: list[MinimalSource] = []
-        retriever = bm25s.BM25().load(cls.BM25_INDEX_PATH, load_corpus=True)
 
         query_tokens = bm25s.tokenize(
             [query],
@@ -55,7 +92,9 @@ class Retriever:
             show_progress=True,
         )
 
-        res = retriever.retrieve(query_tokens, k=k * cls.K_COEFFICIENT)
+        res = cls._get_bm25_retriever().retrieve(
+            query_tokens, k=k * cls.K_COEFFICIENT
+        )
 
         results, scores = res
         for i in range(k * cls.K_COEFFICIENT):
@@ -68,49 +107,53 @@ class Retriever:
         return cls._harmonize_score(bm25_res)
 
     @classmethod
-    def _search_chromadb(cls, query, k=5):
+    def _search_chromadb(cls, query: str, k: int = 5) -> list[MinimalSource]:
         chroma_res: list[MinimalSource] = []
-        chroma_retriever = chromadb.PersistentClient(path=cls.DATA_DIR)
 
-        collection = chroma_retriever.get_collection(cls.COLLECTION_NAME)
+        embeddings = (
+            cls._get_chroma_embedding()
+            .encode(query, show_progress_bar=False)
+            .tolist()
+        )
 
-        model = SentenceTransformer(cls.EMBEDDING_MODEL)
-        embeddings = model.encode(query, show_progress_bar=False).tolist()
-
-        res = collection.query(
+        res = cls._get_collection().query(
             query_embeddings=embeddings, n_results=k * cls.K_COEFFICIENT
         )
 
         ids = res["ids"][0]
-        metadatas = res["metadatas"][0]
-        distances = res["distances"][0]
+        raw_metadatas = res["metadatas"]
+        raw_distances = res["distances"]
+        assert raw_metadatas is not None and raw_distances is not None
+        metadatas = raw_metadatas[0]
+        distances = raw_distances[0]
 
         for i in range(len(ids)):
-            meta: MinimalSource = MinimalSource(**metadatas[i])
+            meta = MinimalSource(
+                file_path=str(metadatas[i]["file_path"]),
+                first_character_index=int(
+                    metadatas[i]["first_character_index"]
+                ),
+                last_character_index=int(metadatas[i]["last_character_index"]),
+            )
             meta.score = 1 / (1 + distances[i])
             chroma_res.append(meta)
 
         return cls._harmonize_score(chroma_res)
 
     @staticmethod
-    def _harmonize_score(res: list[MinimalSource]):
+    def _harmonize_score(res: list[MinimalSource]) -> list[MinimalSource]:
         if not res:
             return res
 
-        scores = [r.score for r in res]
-        min_s, max_s = min(scores), max(scores)
-        range_s = max_s - min_s
-
         for r in res:
-            if range_s == 0:
-                r.score = 1.0
-            else:
-                r.score = (r.score - min_s) / range_s
+            r.score = 1 / (r.score + 60)
 
         return res
 
     @staticmethod
-    def print_res(sources: list[MinimalSource], query: str, k: int = 5):
+    def print_res(
+        sources: list[MinimalSource], query: str, k: int = 5
+    ) -> None:
         print(f"Résultats pour : '{query}'")
 
         for i, source in enumerate(sources):
@@ -122,7 +165,7 @@ class Retriever:
             )
 
     @staticmethod
-    def read_dataset(path):
+    def read_dataset(path: str) -> dict[str, Any]:
         try:
             with open(path, "r", encoding="utf-8", errors="ignore") as f:
                 data_dict = json.load(f)
@@ -132,7 +175,7 @@ class Retriever:
             raise
 
     @classmethod
-    def save_search(cls, search_result: str, dataset_path: str):
+    def save_search(cls, search_result: str, dataset_path: str) -> None:
         output_dir = Path(cls.SEARCH_RESULT_DIR)
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -142,8 +185,10 @@ class Retriever:
             f.write(search_result)
 
     @classmethod
-    def process_multiple_querry(cls, dataset, k, chroma):
-        res_data = {"k": k, "search_results": []}
+    def process_multiple_query(
+        cls, dataset: dict[str, Any], k: int, chroma: bool
+    ) -> StudentSearchResults:
+        res_data: dict[str, Any] = {"k": k, "search_results": []}
 
         for data in dataset["rag_questions"]:
             search_res: list[MinimalSource] = cls.search_mode(
