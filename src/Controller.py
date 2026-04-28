@@ -1,3 +1,4 @@
+import copy
 from logging import Logger
 
 from src.Indexer import Indexer
@@ -27,7 +28,7 @@ class Controller:
         all_chunks = Indexer.load_and_chunk(
             self.RAW_DIR_PATH, max_chunk_size
         )
-        Indexer.build_bm25_index(all_chunks.copy())
+        Indexer.build_bm25_index(copy.deepcopy(all_chunks))
         if chroma:
             Indexer.build_chromadb_index(all_chunks)
         self.logger.info(

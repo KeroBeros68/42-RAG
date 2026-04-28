@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from typing import Any, Optional
 
@@ -71,10 +72,40 @@ class Retriever:
 
         search_res = cls._search_bm25(query, cls._get_chunks(), k)
         if chroma:
-            search_res.extend(cls._search_chromadb(query, k))
-        search_res = list(set(search_res))
+            chroma_res = cls._search_chromadb(query, k)
+            # RRF fusion: sum scores for chunks appearing in both lists
+            score_map: dict[tuple[str, int, int], float] = {}
+            source_map: dict[tuple[str, int, int], MinimalSource] = {}
+            for source in search_res + chroma_res:
+                key = (
+                    source.file_path,
+                    source.first_character_index,
+                    source.last_character_index,
+                )
+                score_map[key] = score_map.get(key, 0.0) + source.score
+                source_map[key] = source
+            search_res = [
+                s.model_copy(
+                    update={
+                        "score": score_map[
+                            (
+                                s.file_path,
+                                s.first_character_index,
+                                s.last_character_index,
+                            )
+                        ]
+                    }
+                )
+                for s in source_map.values()
+            ]
         search_res.sort(key=lambda x: x.score, reverse=True)
         return search_res
+
+    @staticmethod
+    def _clean_text(text: str) -> str:
+        text = re.sub(r"([a-z])([A-Z])", r"\1 \2", text)
+        text = re.sub(r"[^\w\s]", " ", text).replace("_", " ")
+        return text.lower()
 
     @classmethod
     def _search_bm25(
@@ -87,7 +118,7 @@ class Retriever:
         bm25_res: list[MinimalSource] = []
 
         query_tokens = bm25s.tokenize(
-            [query],
+            [cls._clean_text(query)],
             stopwords="en_plus",
             show_progress=True,
         )
@@ -145,8 +176,8 @@ class Retriever:
         if not res:
             return res
 
-        for r in res:
-            r.score = 1 / (r.score + 60)
+        for rank, r in enumerate(res, start=1):
+            r.score = 1 / (rank + 60)
 
         return res
 

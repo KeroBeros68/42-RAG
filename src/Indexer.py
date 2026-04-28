@@ -67,7 +67,7 @@ class Indexer:
                     content = f.read()
                 if not content.strip():
                     continue
-                relative_path = str(file_path.relative_to(repo_path))
+                relative_path = str(file_path).replace("src/", "")
                 chunks = cls.chunk_file(relative_path, content, chunk_size)
                 all_chunks.extend(chunks)
             except Exception as e:  # A CHANGERRRRRRRRRRRRRR

@@ -210,5 +210,5 @@ subject.txt
 reference.txt
 feedback.md
 notation.md
-src/data/raw/*
-src/data/processed/*
+src/data/
+src/data/
